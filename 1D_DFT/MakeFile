@@ -1,0 +1,67 @@
+-include make.inc
+
+slate_dir ?= /opt/slate
+scalapack_libs ?= -L/opt/scalapack/lib -lscalapack -lgfortran
+
+
+CXX      = mpicxx
+CXXFLAGS = -fopenmp -Wall -std=c++17 -MMD -I${slate_dir}/include -DSLATE_NO_CUDA 
+LDFLAGS  = -fopenmp -L${slate_dir}/lib -Wl,-rpath,${slate_dir}/lib 
+LIBS     = -lblaspp -llapackpp 
+
+# ------------------------------------------------------------------------------
+
+slate_src = ${wildcard test*.cc}
+slate_exe = ${basename ${slate_src}}
+
+${slate_exe}: %: %.o
+	${CXX} -o $@ $^ \
+		${LDFLAGS} \
+		-lslate ${LIBS}
+
+
+
+
+# ------------------------------------------------------------------------------
+# Generic rules.
+
+exe = ${slate_exe}
+
+all: ${exe}
+
+.DEFAULT_GOAL := all
+.SUFFIXES:
+
+%.o: %.cc
+	${CXX} ${CXXFLAGS} -c -o $@ $<
+
+clean:
+	-rm -f ${exe} *.o
+
+clean_exe:
+	-rm -f ${exe}
+
+clean_run:
+	-rm -f ${txt}
+
+distclean: clean clean_run
+	-rm -f *.d
+
+-include *.d
+
+
+# ------------------------------------------------------------------------------
+# Run examples.
+
+txt = ${addsuffix .txt,${exe}}
+
+run:
+	${MAKE} -j1 run_not_parallel
+
+run_not_parallel: ${txt}
+
+%.txt: %
+	mpirun -np 4 ./$< | sort -s -k 2n > $@
+
+
+
